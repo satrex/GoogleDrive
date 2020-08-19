@@ -15,7 +15,7 @@ namespace Satrex.GoogleDrive
 {
     public class GoogleDriveInternal
     {
-        static string[] Scopes = { DriveService.Scope.DriveFile };
+        static string[] Scopes = { DriveService.Scope.Drive, DriveService.Scope.DriveFile, DriveService.Scope.DriveAppdata, DriveService.Scope.DriveMetadata, DriveService.Scope.DriveMetadataReadonly, DriveService.Scope.DrivePhotosReadonly, DriveService.Scope.DriveReadonly };
         static string ApplicationName = "Google Drive Manipulator";
 
         private static DriveService service;
@@ -36,14 +36,17 @@ namespace Satrex.GoogleDrive
         {
             UserCredential credential;
             //認証プロセス。credPathが作成されていないとBrowserが起動して認証ページが開くので認証を行って先に進む
-            using (var stream = new FileStream(@"Secrets\client_secret.json", FileMode.Open, FileAccess.Read))
+            using (var stream = new FileStream(@"Secrets/client_secret.json", FileMode.Open, FileAccess.Read))
             {
                 string credPath = Path.Combine
                     (System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal),
                      ".credentials/sheets.googleapis.com-dotnet-quickstart.json");
                 //CredentialファイルがcredPathに保存される
                 credential = GoogleWebAuthorizationBroker.AuthorizeAsync
-                    (GoogleClientSecrets.Load(stream).Secrets, Scopes, "user", CancellationToken.None,
+                    (GoogleClientSecrets.Load(stream).Secrets, 
+                    Scopes, 
+                    "user", 
+                    CancellationToken.None,
                      new FileDataStore(credPath, true)).Result;
             }
             //API serviceを作成、Requestパラメータを設定
@@ -55,7 +58,20 @@ namespace Satrex.GoogleDrive
             return service;
         }
 
-        public static IEnumerable<string> ListFiles(string folderId)
+        public static IEnumerable<Google.Apis.Drive.v3.Data.File> ListFiles()
+        {
+            // Define parameters of request.
+            FilesResource.ListRequest listRequest = GoogleDriveService.Files.List();
+            // listRequest.PageSize = 10;
+            // listRequest.Fields = "nextPageToken, files(id, name)";
+
+            // List files.
+            var fileList= listRequest.Execute();
+            IList<Google.Apis.Drive.v3.Data.File> files = fileList.Files;
+            return files;
+        }
+
+        public static IEnumerable<Google.Apis.Drive.v3.Data.File> ListFiles(string folderId)
         {
             // Define parameters of request.
             FilesResource.ListRequest listRequest = GoogleDriveService.Files.List();
@@ -63,9 +79,9 @@ namespace Satrex.GoogleDrive
             listRequest.Fields = "nextPageToken, files(id, name)";
 
             // List files.
-            IList<Google.Apis.Drive.v3.Data.File> files = listRequest.Execute()
-                .Files;
-            return files.Select(file => file.Name);
+            var fileList= listRequest.Execute();
+            IList<Google.Apis.Drive.v3.Data.File> files = fileList.Files;
+            return files;
         }
 
         public static void MoveToFolder(string fileId, string folderId)

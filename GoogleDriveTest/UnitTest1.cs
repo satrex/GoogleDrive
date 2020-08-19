@@ -8,7 +8,9 @@ namespace GoogleDriveTest
         [Fact]
         public void Test1()
         {
-            GoogleDrive.
+            var files = Satrex.GoogleDrive.GoogleDriveInternal.ListFiles("1r-wagtc1rNhkkIbu8Mcw06WYWAM1kdQf");
+
+            Assert.NotEmpty(files);
 
         }
     }
