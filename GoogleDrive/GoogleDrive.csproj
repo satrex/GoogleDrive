@@ -11,6 +11,12 @@
     <PackageReference Include="Google.Apis.Drive.v3" Version="1.49.0.2030" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="System.Net.Http" Version="4.3.4" />
+    <PackageReference Include="xunit" Version="2.4.1" />
   </ItemGroup>
-
+  <ItemGroup>
+    <None Include="app.config" />
+    <Content Include="Secrets\client_secret.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>
