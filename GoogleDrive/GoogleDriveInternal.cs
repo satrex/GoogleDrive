@@ -211,7 +211,6 @@ namespace Satrex.GoogleDrive
                 Console.WriteLine("An error occurred: " + e.Message);
                 throw e;
             }
-            return null;
         }
     }
 }
