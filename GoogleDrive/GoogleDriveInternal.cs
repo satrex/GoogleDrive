@@ -11,6 +11,9 @@ using Google.Apis.Util.Store;
 using Google.Apis.Services;
 using System.Threading;
 using Google.Apis.Drive.v3.Data;
+using System.Net.Http.Headers;
+using System.Net;
+using System.Reflection;
 
 namespace Satrex.GoogleDrive
 {
@@ -18,6 +21,7 @@ namespace Satrex.GoogleDrive
     {
         public static string GOOGLE_MYMETYPE_FOLDER = @"application/vnd.google-apps.folder";
         public static string GOOGLE_MYMETYPE_DOCS= @"application/vnd.google-apps.document";
+        private const string GOOGLE_MYMETYPE_PDF = @"application/pdf";
         static string[] Scopes = { DriveService.Scope.Drive, DriveService.Scope.DriveFile};
         static string ApplicationName = "Google Drive Manipulator";
 
@@ -35,12 +39,21 @@ namespace Satrex.GoogleDrive
             }
         }
 
+        public static string GetExecutingDirectoryName()
+        {
+            var location = new Uri(Assembly.GetExecutingAssembly().GetName().CodeBase);
+            var locationPath = location.AbsolutePath + location.Fragment;
+            var locationDir = new FileInfo(locationPath).Directory;
+            return locationDir.FullName;
+        }
         private static DriveService CreateDriveService()
         {
             Console.WriteLine(System.Reflection.MethodInfo.GetCurrentMethod().Name + " Start");
             UserCredential credential;
             //認証プロセス。credPathが作成されていないとBrowserが起動して認証ページが開くので認証を行って先に進む
-            using (var stream = new FileStream(@"Secrets/client_secret.json", FileMode.Open, FileAccess.Read))
+            var exeDir = GetExecutingDirectoryName();
+            var secretFilePath = Path.Combine(exeDir, @"Secrets/client_secret.json");
+            using (var stream = new FileStream(secretFilePath, FileMode.Open, FileAccess.Read))
             {
                 string credPath = Path.Combine
                     (System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal),
@@ -187,6 +200,109 @@ namespace Satrex.GoogleDrive
                     CopyFolderDeeply(file.Id, newFile);
                 }
             }
+        }
+
+        public static async Task DownloadFile(string url, string lstrDownloadFile)
+        {
+           // Create Drive API service.
+            _service = GoogleDriveService;
+            // Attempt download
+            // Iterate through file-list and find the relevant file
+            FilesResource.ListRequest listRequest = _service.Files.List();
+            listRequest.Fields = "nextPageToken, files(id, name, mimeType, originalFilename, size)";
+            Google.Apis.Drive.v3.Data.File lobjGoogleFile = null;
+            foreach (var item in listRequest.Execute().Files)
+            {
+                if (url.IndexOf(string.Format("id={0}", item.Id)) > -1)
+                {
+                    Console.WriteLine(string.Format("{0}: {1}", item.OriginalFilename, item.MimeType));
+                    lobjGoogleFile = item;
+                    break;
+                }
+            }
+
+            FilesResource.ExportRequest request = _service.Files.Export(lobjGoogleFile.Id, GOOGLE_MYMETYPE_PDF);
+            Console.WriteLine(request.MimeType);
+            MemoryStream lobjMS = new MemoryStream();
+            await request.DownloadAsync(lobjMS);
+
+            // At this point the MemoryStream has a length of zero?
+
+            lobjMS.Position = 0;
+            var lobjFS = new System.IO.FileStream(lstrDownloadFile, System.IO.FileMode.Create, System.IO.FileAccess.Write);
+            await lobjMS.CopyToAsync(lobjFS);
+        }
+
+        public static async Task<byte[]> DownloadFileToByteArray(string url)
+        {
+           // Create Drive API service.
+            _service = GoogleDriveService;
+            // Attempt download
+            // Iterate through file-list and find the relevant file
+            FilesResource.ListRequest listRequest = _service.Files.List();
+            listRequest.Fields = "nextPageToken, files(id, name, mimeType, originalFilename, size)";
+            Google.Apis.Drive.v3.Data.File lobjGoogleFile = null;
+            foreach (var item in listRequest.Execute().Files)
+            {
+                if (url.IndexOf(string.Format("id={0}", item.Id)) > -1)
+                {
+                    Console.WriteLine(string.Format("{0}: {1}", item.OriginalFilename, item.MimeType));
+                    lobjGoogleFile = item;
+                    break;
+                }
+            }
+
+            FilesResource.ExportRequest request = _service.Files.Export(lobjGoogleFile.Id, GOOGLE_MYMETYPE_PDF);
+            Console.WriteLine(request.MimeType);
+            using MemoryStream lobjMS = new MemoryStream();
+            await request.DownloadAsync(lobjMS);
+
+            // At this point the MemoryStream has a length of zero?
+            lobjMS.Position = 0;
+            return lobjMS.ToArray();
+        }
+
+        public static async Task DownloadFile(string fileId)
+        {
+            const int KB = 0x400;
+            var chunkSize = 256 * KB; // 256KB;
+
+            var fileRequest = GoogleDriveService.Files.Get(fileId);
+            fileRequest.Fields = "size";
+            var fileResponse = fileRequest.Execute();
+
+            var exportRequest = GoogleDriveService.Files.Export(fileResponse.Id, GOOGLE_MYMETYPE_PDF);
+            var client = exportRequest.Service.HttpClient;
+
+            //you would need to know the file size
+            var size = fileResponse.Size;
+
+            await using var file = new FileStream(fileResponse.Name, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            file.SetLength((long) size);
+
+            var chunks = (size / chunkSize) + 1;
+            for (long index = 0; index < chunks; index++)
+            {
+                var request = exportRequest.CreateRequest();
+
+                var from = index * chunkSize;
+                var to = @from + chunkSize - 1;
+
+                request.Headers.Range = new RangeHeaderValue(@from, to);
+
+                var response = await client.SendAsync(request);
+
+                if (response.StatusCode != HttpStatusCode.PartialContent && !response.IsSuccessStatusCode) continue;
+
+                await using var stream = await response.Content.ReadAsStreamAsync();
+                file.Seek(@from, SeekOrigin.Begin);
+                await stream.CopyToAsync(file);
+            }
+        }
+        public static Stream ExportFile(string documentFileId, string mymeType)
+        {
+            return GoogleDriveService.Files.Export(documentFileId, mymeType).ExecuteAsStream();
+
         }
 
         /// <summary>

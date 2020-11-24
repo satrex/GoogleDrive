@@ -13,5 +13,13 @@ namespace GoogleDriveTest
             Assert.NotEmpty(files);
 
         }
+        [Fact]
+        public void Test2()
+        {
+            // var files = Satrex.GoogleDrive.GoogleDriveInternal
+
+            // Assert.NotEmpty(files);
+
+        }
     }
 }
