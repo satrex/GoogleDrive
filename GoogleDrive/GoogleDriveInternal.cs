@@ -25,6 +25,13 @@ namespace Satrex.GoogleDrive
         static string[] Scopes = { DriveService.Scope.Drive, DriveService.Scope.DriveFile};
         static string ApplicationName = "Google Drive Manipulator";
 
+        private static string credentialFilePath = @"Secrets/client_secret.json";
+        public static string CredentialFilePath
+        {
+            get { return credentialFilePath; }
+            set { credentialFilePath = value; }
+        }
+        
         private static DriveService _service;
 
         public static DriveService GoogleDriveService
@@ -33,7 +40,7 @@ namespace Satrex.GoogleDrive
             {
                 if (_service == null)
                 {
-                    _service = CreateDriveService();
+                    _service = CreateDriveService(credentialFilePath: CredentialFilePath);
                 }
                 return _service;
             }
@@ -46,13 +53,13 @@ namespace Satrex.GoogleDrive
             var locationDir = new FileInfo(locationPath).Directory;
             return locationDir.FullName;
         }
-        private static DriveService CreateDriveService()
+        private static DriveService CreateDriveService(string credentialFilePath)
         {
             Console.WriteLine(System.Reflection.MethodInfo.GetCurrentMethod().Name + " Start");
             UserCredential credential;
             //認証プロセス。credPathが作成されていないとBrowserが起動して認証ページが開くので認証を行って先に進む
             var exeDir = GetExecutingDirectoryName();
-            var secretFilePath = Path.Combine(exeDir, @"Secrets/client_secret.json");
+            var secretFilePath = Path.Combine(exeDir, credentialFilePath);
             using (var stream = new FileStream(secretFilePath, FileMode.Open, FileAccess.Read))
             {
                 string credPath = Path.Combine

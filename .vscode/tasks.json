@@ -44,7 +44,7 @@
             "type": "process",
             "args": [
                 "test",
-                "${workspaceFolder}/GoogleDriveTest/GoogleDriveTest.csproj"
+                "${workspaceFolder}/GoogleDriveTest"
             ],
             "problemMatcher": "$msCompile"
         }
