@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -21,7 +22,7 @@ namespace Satrex.GoogleDrive
     {
         public static string GOOGLE_MYMETYPE_FOLDER = @"application/vnd.google-apps.folder";
         public static string GOOGLE_MYMETYPE_DOCS= @"application/vnd.google-apps.document";
-        private const string GOOGLE_MYMETYPE_PDF = @"application/pdf";
+        public const string GOOGLE_MYMETYPE_PDF = @"application/pdf";
         static string[] Scopes = { DriveService.Scope.Drive, DriveService.Scope.DriveFile};
         static string ApplicationName = "Google Drive Manipulator";
 
@@ -82,23 +83,9 @@ namespace Satrex.GoogleDrive
             return service;
         }
 
-        public static IEnumerable<Google.Apis.Drive.v3.Data.File> ListFiles()
-        {
-            Console.WriteLine(System.Reflection.MethodInfo.GetCurrentMethod().Name + " Start");
-            // Define parameters of request.
-            FilesResource.ListRequest listRequest = GoogleDriveService.Files.List();
-            // listRequest.PageSize = 10;
-            // listRequest.Fields = "nextPageToken, files(id, name)";
-
-            // List files.
-            var fileList= listRequest.Execute();
-            IList<Google.Apis.Drive.v3.Data.File> files = fileList.Files;
-            return files;
-        }
-
         public static IEnumerable<Google.Apis.Drive.v3.Data.File> ListFiles(string folderId)
         {
-            Console.WriteLine(System.Reflection.MethodInfo.GetCurrentMethod().Name + " Start");
+            // Console.WriteLine(System.Reflection.MethodInfo.GetCurrentMethod().Name + " Start");
             // Define parameters of request.
             FilesResource.ListRequest listRequest = GoogleDriveService.Files.List();
             listRequest.Q = string.Format("'{0}' in parents", folderId);
@@ -112,6 +99,10 @@ namespace Satrex.GoogleDrive
 
         public static string CreateFolder(string name, string parentFolderId)
         {
+            System.Diagnostics.Trace.Assert(!string.IsNullOrWhiteSpace(name),
+            "name argument not specified.");
+            System.Diagnostics.Trace.Assert(!string.IsNullOrWhiteSpace(parentFolderId),"Parent folder Id not specified.");
+
             Console.WriteLine(System.Reflection.MethodInfo.GetCurrentMethod().Name + " Start");
             Google.Apis.Drive.v3.Data.File newFile = new Google.Apis.Drive.v3.Data.File();
             newFile.Name = name;
@@ -209,6 +200,22 @@ namespace Satrex.GoogleDrive
             }
         }
 
+        public static async Task DownloadFileById(string id, string lstrDownloadFile)
+        {
+            // Create Drive API service.
+            _service = GoogleDriveService;
+            var file = _service.Files.Get(id).Execute();
+            FilesResource.ExportRequest request = _service.Files.Export(file.Id, GOOGLE_MYMETYPE_PDF);
+            Console.WriteLine(request.MimeType);
+            MemoryStream lobjMS = new MemoryStream();
+            await request.DownloadAsync(lobjMS);
+
+            // At this point the MemoryStream has a length of zero?
+
+            lobjMS.Position = 0;
+            var lobjFS = new System.IO.FileStream(lstrDownloadFile, System.IO.FileMode.Create, System.IO.FileAccess.Write);
+            await lobjMS.CopyToAsync(lobjFS);
+        }
         public static async Task DownloadFile(string url, string lstrDownloadFile)
         {
            // Create Drive API service.
@@ -218,7 +225,9 @@ namespace Satrex.GoogleDrive
             FilesResource.ListRequest listRequest = _service.Files.List();
             listRequest.Fields = "nextPageToken, files(id, name, mimeType, originalFilename, size)";
             Google.Apis.Drive.v3.Data.File lobjGoogleFile = null;
-            foreach (var item in listRequest.Execute().Files)
+            var files = listRequest.Execute().Files;
+            
+            foreach (var item in files)
             {
                 if (url.IndexOf(string.Format("id={0}", item.Id)) > -1)
                 {
